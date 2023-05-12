@@ -1,0 +1,14 @@
+.env
+*.pyc
+*.pyo
+*.log
+*.log*
+.idea/
+log/
+migrations/
+venv
+temporydata/
+media/
+utils/export_files/
+utils/upload_files/
+lock.txt
