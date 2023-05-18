@@ -129,7 +129,7 @@ def get_consumable_maps(request):
 # 新增固定资产
 class FixedAssetsList(generics.ListCreateAPIView):
     model = FixedAssets
-    queryset = model.objects.all().order_by('-entry_date')
+    queryset = model.objects.all().order_by('asset_number')
     serializer_class = FixedAssetsSerializer
     table_name = model._meta.db_table
     verbose_name = model._meta.verbose_name
