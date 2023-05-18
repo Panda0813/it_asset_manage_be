@@ -61,9 +61,9 @@ def analysis_asset(datas):
     df = df.replace({np.nan: None})
     ndf = df.copy()
     ndf['entry_date'] = ndf['entry_date'].apply(trans_float_ts, args=('%Y-%m-%d', '%Y-%m-%d'))
-    ndf['entry_date'] = ndf['entry_date'].map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date() if x else x)
+    ndf['entry_date'] = ndf['entry_date'].map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date() if x else None)
     ndf['receive_date'] = ndf['receive_date'].apply(trans_float_ts, args=('%Y-%m-%d', '%Y-%m-%d'))
-    ndf['receive_date'] = ndf['receive_date'].map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date() if x else x)
+    ndf['receive_date'] = ndf['receive_date'].map(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date() if x else None)
     oa_user_sections = get_oa_user_sections()
     us_df = pd.DataFrame(oa_user_sections)
     us_df = us_df[['user_work_id', 'user_name', 'department', 'subsector']]
@@ -95,7 +95,7 @@ def analysis_material(datas):
     ndf = df.copy()
     ndf['receive_date'] = ndf['receive_date'].apply(trans_float_ts, args=('%Y-%m-%d', '%Y-%m-%d'))
     ndf['receive_date'] = ndf['receive_date'].map(
-        lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date() if x else x)
+        lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date() if x else None)
     oa_user_sections = get_oa_user_sections()
     us_df = pd.DataFrame(oa_user_sections)
     us_df = us_df[['user_work_id', 'user_name', 'department', 'subsector']]

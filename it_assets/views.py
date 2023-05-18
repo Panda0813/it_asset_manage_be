@@ -335,6 +335,7 @@ def insert_fixed_assets(datas):
     for data in datas:
         now_ts = datetime.datetime.now()
         count += 1
+        lineNo = count + 1
         asset_number = data.get('asset_number')
         qs = FixedAssets.objects.filter(asset_number=asset_number)
         with transaction.atomic():
@@ -342,9 +343,15 @@ def insert_fixed_assets(datas):
             try:
                 if qs:
                     data['update_time'] = now_ts
-                    qs.update(**data)
+                    try:
+                        qs.update(**data)
+                    except Exception as e:
+                        return VIEW_FAIL(msg='固定资产存储失败, 错误所在行：{}, error:{}'.format(lineNo, str(e)))
                 else:
-                    fixed_asset = FixedAssets.objects.create(**data)
+                    try:
+                        fixed_asset = FixedAssets.objects.create(**data)
+                    except Exception as e:
+                        return VIEW_FAIL(msg='固定资产存储失败, 错误所在行：{}, error:{}'.format(lineNo, str(e)))
                     FixedAssetStatusRecord.objects.create(fixed_asset_id=fixed_asset.id, status=fixed_asset.status,
                                                           receive_date=fixed_asset.receive_date,
                                                           user_name=fixed_asset.user_name,
@@ -355,7 +362,7 @@ def insert_fixed_assets(datas):
             except Exception as e:
                 transaction.savepoint_rollback(save_id)
                 logger.error('固定资产存储失败,error:{}'.format(str(e)))
-                raise serializers.ValidationError('固定资产存储失败')
+                return VIEW_FAIL(msg='固定资产存储失败, error:{}'.format(str(e)))
 
 
 # 批量导入固定资产
@@ -373,18 +380,41 @@ def upload_fixed_assets(request):
             df = pd.read_excel(upload_path, sheet_name='固定资产')
             datas = df.to_dict('records')
             datas = analysis_asset(datas)
-            try:
-                insert_fixed_assets(datas)
-            except Exception as e:
-                logger.error('固定资产插入数据库失败, error:{}'.format(str(e)))
-                error_code = e.args[0]
-                if error_code == 1111:
-                    msg = e.args[1]
-                    error = e.args[1]
-                else:
-                    msg = '保存失败'
-                    error = str(e)
-                return VIEW_FAIL(msg=msg, data={'error': error})
+            count = 0
+            for data in datas:
+                now_ts = datetime.datetime.now()
+                count += 1
+                lineNo = count + 1
+                asset_number = data.get('asset_number')
+                qs = FixedAssets.objects.filter(asset_number=asset_number)
+                with transaction.atomic():
+                    save_id = transaction.savepoint()
+                    try:
+                        if qs:
+                            data['update_time'] = now_ts
+                            try:
+                                qs.update(**data)
+                            except Exception as e:
+                                logger.error('固定资产存储失败,error:{}'.format(str(e)))
+                                return VIEW_FAIL(msg='固定资产存储失败, 错误所在行：{}, error:{}'.format(lineNo, str(e)))
+                        else:
+                            try:
+                                fixed_asset = FixedAssets.objects.create(**data)
+                            except Exception as e:
+                                logger.error('固定资产存储失败,error:{}'.format(str(e)))
+                                return VIEW_FAIL(msg='固定资产存储失败, 错误所在行：{}, error:{}'.format(lineNo, str(e)))
+                            FixedAssetStatusRecord.objects.create(fixed_asset_id=fixed_asset.id,
+                                                                  status=fixed_asset.status,
+                                                                  receive_date=fixed_asset.receive_date,
+                                                                  user_name=fixed_asset.user_name,
+                                                                  user_work_id=fixed_asset.user_work_id,
+                                                                  department=fixed_asset.department,
+                                                                  subsector=fixed_asset.subsector)
+                        transaction.savepoint_commit(save_id)
+                    except Exception as e:
+                        transaction.savepoint_rollback(save_id)
+                        logger.error('固定资产存储失败,error:{}'.format(str(e)))
+                        return VIEW_FAIL(msg='固定资产存储失败, error:{}'.format(str(e)))
             return VIEW_SUCCESS(msg='导入成功')
         except Exception as e:
             logger.error('文件解析出错, error:{}'.format(str(e)))
