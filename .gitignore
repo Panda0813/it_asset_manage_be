@@ -12,3 +12,4 @@ media/
 utils/export_files/
 utils/upload_files/
 lock.txt
+.ssh/
