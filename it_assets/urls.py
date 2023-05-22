@@ -15,4 +15,6 @@ urlpatterns = [
     url(r'^export-fixed-asset$', views.export_fixed_assets),
     url(r'^upload-consumable-material$', views.upload_consumable_material),
     url(r'^export-consumable-material$', views.export_consumable_material),
+    url(r'^batch-delete-asset$', views.batch_delete_asset),
+    url(r'^batch-delete-material$', views.batch_delete_material),
 ]

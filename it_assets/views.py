@@ -7,7 +7,7 @@ from django.db import transaction
 from it_assets.serializers import FixedAssetsSerializer, ConsumableMaterialSerializer, AssetStatusRecordSerializer
 from it_assets.models import FixedAssets, ConsumableMaterial, FixedAssetStatusRecord
 
-from utils.log_utils import set_create_log, set_update_log, set_delete_log
+from utils.log_utils import set_create_log, set_update_log, set_delete_log, save_operateLog
 from utils.ext_utils import REST_FAIL, REST_SUCCESS, VIEW_FAIL, VIEW_SUCCESS, get_file_path, execute_batch_sql, create_excel_resp
 from it_assets.analy_utils import analysis_asset, analysis_material
 
@@ -213,6 +213,24 @@ class FixedAssetsDetail(generics.RetrieveUpdateDestroyAPIView):
         return REST_SUCCESS({'msg': '删除成功'})
 
 
+@api_view(['POST'])
+def batch_delete_asset(request):
+    model = FixedAssets
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
+    try:
+        delete_ls = request.POST.get('delete_ls')
+        if delete_ls:
+            wait_delete_ls = delete_ls.split(',')
+            qs = FixedAssets.objects.filter(id__in=wait_delete_ls)
+            qs.delete()
+            save_operateLog('delete', request.user, table_name, verbose_name, before={'id': delete_ls})
+        return REST_SUCCESS({'msg': '操作成功'})
+    except Exception as e:
+        logger.error('批量删除固定资产失败,error:{}'.format(str(e)))
+        return VIEW_FAIL(msg='批量删除固定资产失败, error:{}'.format(str(e)))
+
+
 # 新增耗材
 class ConsumableMaterialList(generics.ListCreateAPIView):
     model = ConsumableMaterial
@@ -286,6 +304,24 @@ class ConsumableMaterialDetail(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         self.perform_destroy(instance)
         return REST_SUCCESS({'msg': '删除成功'})
+
+
+@api_view(['POST'])
+def batch_delete_material(request):
+    model = ConsumableMaterial
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
+    try:
+        delete_ls = request.POST.get('delete_ls')
+        if delete_ls:
+            wait_delete_ls = delete_ls.split(',')
+            qs = ConsumableMaterial.objects.filter(id__in=wait_delete_ls)
+            qs.delete()
+            save_operateLog('delete', request.user, table_name, verbose_name, before={'id': delete_ls})
+        return REST_SUCCESS({'msg': '操作成功'})
+    except Exception as e:
+        logger.error('批量删除固定资产失败,error:{}'.format(str(e)))
+        return VIEW_FAIL(msg='批量删除固定资产失败, error:{}'.format(str(e)))
 
 
 class AssetStatusRecordList(generics.ListCreateAPIView):
@@ -368,6 +404,9 @@ def insert_fixed_assets(datas):
 # 批量导入固定资产
 @api_view(['POST'])
 def upload_fixed_assets(request):
+    model = FixedAssets
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
     try:
         try:
             file = request.FILES.get('file', '')
@@ -415,6 +454,7 @@ def upload_fixed_assets(request):
                         transaction.savepoint_rollback(save_id)
                         logger.error('固定资产存储失败,error:{}'.format(str(e)))
                         return VIEW_FAIL(msg='固定资产存储失败, error:{}'.format(str(e)))
+            save_operateLog('add', request.user, table_name, verbose_name, after={'id': '批量上传{}条数据'.format(count)})
             return VIEW_SUCCESS(msg='导入成功')
         except Exception as e:
             logger.error('文件解析出错, error:{}'.format(str(e)))
@@ -556,11 +596,15 @@ def insert_consumable_material(datas):
     if len(insert_ls) + len(update_ls) > 0:
         execute_batch_sql(insert_sql, insert_ls)
         execute_batch_sql(update_sql, update_ls)
+    return count
 
 
 # 导入耗材
 @api_view(['POST'])
 def upload_consumable_material(request):
+    model = ConsumableMaterial
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
     try:
         try:
             file = request.FILES.get('file', '')
@@ -574,7 +618,7 @@ def upload_consumable_material(request):
             datas = df.to_dict('records')
             datas = analysis_material(datas)
             try:
-                insert_consumable_material(datas)
+                count = insert_consumable_material(datas)
             except Exception as e:
                 logger.error('耗材信息插入数据库失败, error:{}'.format(str(e)))
                 error_code = e.args[0]
@@ -585,6 +629,7 @@ def upload_consumable_material(request):
                     msg = '保存失败'
                     error = str(e)
                 return VIEW_FAIL(msg=msg, data={'error': error})
+            save_operateLog('add', request.user, table_name, verbose_name, after={'id': '批量上传{}条数据'.format(count)})
             return VIEW_SUCCESS(msg='导入成功')
         except Exception as e:
             logger.error('文件解析出错, error:{}'.format(str(e)))
