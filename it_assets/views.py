@@ -29,7 +29,7 @@ def get_assets_maps(request):
         category_ls_ = list(set(category_ls))
         category_ls_.sort(key=category_ls.index)
         category_ls = category_ls_
-    name_ls = ['笔记本', '台式机', '投影仪', '电视', '广告机', '显示器', '打印机', '摄像头', '交换机', '扫描仪',
+    name_ls = ['笔记本电脑', '台式机', '投影仪', '电视', '广告机', '显示器', '打印机', '摄像头', '交换机', '扫描仪',
                '瘦客户机', '存储设备', 'VPN主机', '服务器及3Par设备一套', '防火墙', '服务器', '会议系统电话',
                '全向麦克风', '扫描枪', '英方一体机']
     name_qs = FixedAssets.objects.values('name').distinct()
@@ -153,6 +153,7 @@ class FixedAssetsList(generics.ListCreateAPIView):
             queryset = queryset.filter(network=network)
 
         fuzzy_params = {}
+        fuzzy_params['model_code'] = request.GET.get('model_code', '')
         fuzzy_params['asset_number'] = request.GET.get('asset_number', '')
         fuzzy_params['inner_number'] = request.GET.get('inner_number', '')
         fuzzy_params['user_name'] = request.GET.get('user_name', '')
