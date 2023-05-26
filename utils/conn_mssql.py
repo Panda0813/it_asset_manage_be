@@ -2,6 +2,7 @@ from utils.ext_utils import dictfetchall
 import pymssql
 import pandas as pd
 import logging
+import re
 
 logger = logging.getLogger('django')
 
@@ -80,7 +81,7 @@ def get_oa_sections():
     return sections
 
 
-def get_oa_user_sections():
+def get_oa_user_sections(user_work_id=None):
     conn = get_mssql_conn()
     cur = conn.cursor()
     sql = '''select User_id, loginid, convert(nvarchar(50), User_name) as user_name,
@@ -91,9 +92,12 @@ def get_oa_user_sections():
                       from UniicUsers u left join UniicDepartment dp on u.DepartmentId=dp.id
                       left join UniicDepartment dp2 on dp.supdepid=dp2.id
                       left join UniicDepartment dp3 on dp2.supdepid=dp3.id
-            where CurrentStatus=1 and not (User_name like '%紫存%')
+            where CurrentStatus=1 and not (User_name like '%紫存%') {}
             order by User_name'''
-    cur.execute(sql)
+    filter_sql = ''
+    if user_work_id:
+        filter_sql += " and Worker_id='{}'".format(user_work_id)
+    cur.execute(sql.format(filter_sql))
     qs = dictfetchall(cur)
     if qs:
         df = pd.DataFrame(qs)
@@ -125,6 +129,78 @@ def get_oa_user_sections():
                     return x['d1']
                 else:
                     return x['d2']
+        ddf['d2'] = ddf.apply(lambda x: check_d2_2(x), axis=1)
+        ddf['department'] = ddf['d3']
+        ddf['subsector'] = ddf['d2']
+        ddf.drop(['d4', 'd3', 'd2', 'd1'], axis=1, inplace=True)
+        ddf['user_work_id'] = pd.to_numeric(ddf['user_work_id'], errors='coerce')
+        ddf.dropna(axis=0, subset=['user_work_id'], inplace=True)
+        ddf['user_work_id'] = ddf['user_work_id'].astype(int).astype(str)
+
+        def trans_name(x):
+            user_name = re.sub(r'\d+', '', x['user_name'])
+            no_ = re.findall(r'\d+', x['loginid'])
+            if no_:
+                user_name = user_name + no_[0]
+            return user_name
+        ddf['user_name'] = ddf.apply(lambda x: trans_name(x), axis=1)
+        qs = ddf.to_dict('records')
+    cur.close()
+    conn.close()
+    return qs
+
+
+def get_sections_tree():
+    conn = get_mssql_conn()
+    cur = conn.cursor()
+    # sql = '''select convert(nvarchar(50), dp3.departmentname) as d3,
+    #                   convert(nvarchar(50), dp2.departmentname) as d2,
+    #                   convert(nvarchar(50), dp.departmentname) as d1
+    #                   from  UniicDepartment dp
+    #                   left join UniicDepartment dp2 on dp.supdepid=dp2.id
+    #                   left join UniicDepartment dp3 on dp2.supdepid=dp3.id where dp.canceled is null'''
+    sql = '''select convert(nvarchar(50), dp3.departmentname) as d3,
+                  convert(nvarchar(50), dp2.departmentname) as d2,
+                  convert(nvarchar(50), dp.departmentname) as d1
+                  from UniicUsers u left join UniicDepartment dp on u.DepartmentId=dp.id
+                  left join UniicDepartment dp2 on dp.supdepid=dp2.id
+                  left join UniicDepartment dp3 on dp2.supdepid=dp3.id
+                  where CurrentStatus=1 and not (User_name like '%紫存%')'''
+    cur.execute(sql)
+    qs = dictfetchall(cur)
+    if qs:
+        df = pd.DataFrame(qs)
+        ddf = df.copy()
+        ddf['d4'] = ddf['d2']
+
+        def check_d2(x):
+            if pd.isnull(x['d3']):
+                return None
+            else:
+                return x['d2']
+
+        ddf['d2'] = ddf.apply(lambda x: check_d2(x), axis=1)
+
+        def check_d3(x):
+            if pd.isnull(x['d3']):
+                if pd.isnull(x['d4']):
+                    return x['d1']
+                else:
+                    return x['d4']
+            else:
+                return x['d3']
+
+        ddf['d3'] = ddf.apply(lambda x: check_d3(x), axis=1)
+
+        def check_d2_2(x):
+            if pd.isnull(x['d4']):
+                return x['d2']
+            else:
+                if pd.isnull(x['d2']):
+                    return x['d1']
+                else:
+                    return x['d2']
+
         ddf['d2'] = ddf.apply(lambda x: check_d2_2(x), axis=1)
         ddf['department'] = ddf['d3']
         ddf['subsector'] = ddf['d2']

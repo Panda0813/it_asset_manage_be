@@ -21,7 +21,7 @@ from users.models import Section, User, OperationLog, Role
 from utils.log_utils import set_update_log, set_delete_log, set_create_log
 from utils.pagination import MyPagePagination
 from it_asset_manage_be import settings
-from utils.conn_mssql import get_oa_users, get_oa_sections, get_oa_user_sections
+from utils.conn_mssql import get_oa_users, get_oa_sections, get_oa_user_sections, get_sections_tree
 from utils.email_utils import send_pwd_email
 
 
@@ -419,6 +419,16 @@ def query_oa_sections(request):
 def query_user_sections(request):
     try:
         datas = get_oa_user_sections()
+        return REST_SUCCESS(datas)
+    except Exception as e:
+        logger.error('查询失败, error: {}'.format(traceback.format_exc()))
+        return REST_FAIL({'msg': '查询失败, error: {}'.format(str(e))})
+
+
+@api_view(['GET'])
+def query_sections_tree(request):
+    try:
+        datas = get_sections_tree()
         return REST_SUCCESS(datas)
     except Exception as e:
         logger.error('查询失败, error: {}'.format(traceback.format_exc()))

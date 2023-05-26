@@ -21,4 +21,5 @@ urlpatterns = [
     url(r'^get-oa-sections$', views.query_oa_sections),
     url(r'^forget-pwd$', views.forget_pwd),
     url(r'^get-oa-user-sections$', views.query_user_sections),
+    url(r'^get-sections-tree$', views.query_sections_tree),
 ]
