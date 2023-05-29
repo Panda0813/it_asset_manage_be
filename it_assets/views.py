@@ -10,6 +10,7 @@ from it_assets.models import FixedAssets, ConsumableMaterial, FixedAssetStatusRe
 from utils.log_utils import set_create_log, set_update_log, set_delete_log, save_operateLog
 from utils.ext_utils import REST_FAIL, REST_SUCCESS, VIEW_FAIL, VIEW_SUCCESS, get_file_path, execute_batch_sql, create_excel_resp
 from it_assets.analy_utils import analysis_asset, analysis_material
+from utils.conn_mssql import query_section_user
 
 import os
 import datetime
@@ -151,6 +152,11 @@ class FixedAssetsList(generics.ListCreateAPIView):
         network = request.GET.get('network', '')
         if network:
             queryset = queryset.filter(network=network)
+        department_id = request.GET.get('department', '')
+        if department_id:
+            subsector_id = request.GET.get('subsector', None)
+            user_work_ids = query_section_user(department_id, subsector_id)
+            queryset = queryset.filter(user_work_id__in=user_work_ids)
 
         fuzzy_params = {}
         fuzzy_params['model_code'] = request.GET.get('model_code', '')
@@ -246,6 +252,11 @@ class ConsumableMaterialList(generics.ListCreateAPIView):
         if name:
             name_ls = name.split(',')
             queryset = queryset.filter(name__in=name_ls)
+        department_id = request.GET.get('department', '')
+        if department_id:
+            subsector_id = request.GET.get('subsector', None)
+            user_work_ids = query_section_user(department_id, subsector_id)
+            queryset = queryset.filter(user_work_id__in=user_work_ids)
 
         fuzzy_params = {}
         fuzzy_params['model_code'] = request.GET.get('model_code', '')
