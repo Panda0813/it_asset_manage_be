@@ -238,7 +238,7 @@ def batch_delete_asset(request):
         return VIEW_FAIL(msg='批量删除固定资产失败, error:{}'.format(str(e)))
 
 
-# 新增耗材
+# 新增非固定资产
 class ConsumableMaterialList(generics.ListCreateAPIView):
     model = ConsumableMaterial
     queryset = model.objects.all().order_by('-create_time')
@@ -575,7 +575,7 @@ def export_fixed_assets(request):
         return REST_FAIL({'msg': '固定资产导出失败, error: {}'.format(str(e))})
 
 
-# 批量插入耗材信息
+# 批量插入非固定资产信息
 def insert_consumable_material(datas):
     insert_sql = '''insert into it_consumable_material(name, brand, model_code, serial_number, supplier, receive_date, 
                             user_name, user_work_id, department, subsector, create_time, update_time, remarks)
@@ -611,7 +611,7 @@ def insert_consumable_material(datas):
     return count
 
 
-# 导入耗材
+# 导入非固定资产
 @api_view(['POST'])
 def upload_consumable_material(request):
     model = ConsumableMaterial
@@ -626,13 +626,13 @@ def upload_consumable_material(request):
             with open(upload_path, 'wb') as f:
                 for i in file.chunks():
                     f.write(i)
-            df = pd.read_excel(upload_path, sheet_name='耗材')
+            df = pd.read_excel(upload_path, sheet_name='非固定资产')
             datas = df.to_dict('records')
             datas = analysis_material(datas)
             try:
                 count = insert_consumable_material(datas)
             except Exception as e:
-                logger.error('耗材信息插入数据库失败, error:{}'.format(str(e)))
+                logger.error('非固定资产信息插入数据库失败, error:{}'.format(str(e)))
                 error_code = e.args[0]
                 if error_code == 1111:
                     msg = e.args[1]
@@ -647,11 +647,11 @@ def upload_consumable_material(request):
             logger.error('文件解析出错, error:{}'.format(str(e)))
             return VIEW_FAIL(msg='文件解析出错, error:{}'.format(str(e)))
     except Exception as e:
-        logger.error('耗材信息导入失败, error:{}'.format(str(e)))
-        return VIEW_FAIL(msg='耗材信息导入失败', data={'error': str(e)})
+        logger.error('非固定资产信息导入失败, error:{}'.format(str(e)))
+        return VIEW_FAIL(msg='非固定资产信息导入失败', data={'error': str(e)})
 
 
-# 导出耗材
+# 导出非固定资产
 @api_view(['GET'])
 def export_consumable_material(request):
     try:
@@ -676,9 +676,9 @@ def export_consumable_material(request):
             obj = obj.filter(**filter_params)
         qs = obj.values('name', 'brand', 'model_code', 'serial_number', 'user_name', 'department', 'subsector',
                         'supplier', 'receive_date','remarks')
-        blank_path = os.path.dirname(__file__) + '/blank_files/耗材表.xlsx'
+        blank_path = os.path.dirname(__file__) + '/blank_files/非固定资产表.xlsx'
         if not qs:
-            return create_excel_resp(blank_path, '耗材表')
+            return create_excel_resp(blank_path, '非固定资产表')
         df = pd.DataFrame(list(qs))
         # df.insert(0, 'no', range(1, 1 + len(df)))
         df['receive_date'] = df['receive_date'].map(lambda x: x.strftime('%Y-%m-%d') if x else x)
@@ -704,8 +704,8 @@ def export_consumable_material(request):
         border_format = workbook.add_format({'border': 1})
         title_fmt = workbook.add_format({'bold': True, 'font_size': 12, 'font_name': '等线',
                                          'bg_color': '#d9d9d9', 'text_wrap': True, 'valign': 'vcenter'})
-        df.to_excel(writer, sheet_name='耗材', header=False, index=False, startcol=0, startrow=1)
-        worksheet = writer.sheets['耗材']
+        df.to_excel(writer, sheet_name='非固定资产', header=False, index=False, startcol=0, startrow=1)
+        worksheet = writer.sheets['非固定资产']
         l_end = len(df.index) + 1
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(0, col_num, value, title_fmt)
@@ -718,7 +718,7 @@ def export_consumable_material(request):
         worksheet.conditional_format('A1:J%d' % l_end, {'type': 'blanks', 'format': border_format})
         worksheet.conditional_format('A1:J%d' % l_end, {'type': 'no_blanks', 'format': border_format})
         writer.save()
-        return create_excel_resp(file_path, '耗材表')
+        return create_excel_resp(file_path, '非固定资产表')
     except Exception as e:
-        logger.error('耗材导出失败, error: {}'.format(traceback.format_exc()))
-        return REST_FAIL({'msg': '耗材导出失败, error: {}'.format(str(e))})
+        logger.error('非固定资产导出失败, error: {}'.format(traceback.format_exc()))
+        return REST_FAIL({'msg': '非固定资产导出失败, error: {}'.format(str(e))})

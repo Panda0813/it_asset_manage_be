@@ -66,7 +66,7 @@ class ConsumableMaterial(models.Model):
 
     class Meta:
         db_table = 'it_consumable_material'
-        verbose_name = '耗材表'
+        verbose_name = '非固定资产表'
         verbose_name_plural = verbose_name
 
 
