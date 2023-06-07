@@ -755,7 +755,7 @@ def export_consumable_material(request):
 # 新增网络环境记录
 class NetworkRecordList(generics.ListCreateAPIView):
     model = UserNetworkRecord
-    queryset = model.objects.all().order_by('user_name')
+    queryset = model.objects.all().order_by('user_work_id')
     serializer_class = UserNetworkRecordSerializer
     table_name = model._meta.db_table
     verbose_name = model._meta.verbose_name
