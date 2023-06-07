@@ -1,5 +1,5 @@
 from rest_framework import serializers, validators
-from it_assets.models import FixedAssets, ConsumableMaterial, FixedAssetStatusRecord
+from it_assets.models import FixedAssets, ConsumableMaterial, FixedAssetStatusRecord, UserNetworkRecord
 from django.db import transaction
 
 import datetime
@@ -69,3 +69,10 @@ class AssetStatusRecordSerializer(serializers.ModelSerializer):
                 logger.error('状态记录存储失败,error:{}'.format(str(e)))
                 raise serializers.ValidationError('状态记录存储失败')
         return status_record
+
+
+class UserNetworkRecordSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserNetworkRecord
+        fields = '__all__'

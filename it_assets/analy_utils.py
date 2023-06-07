@@ -103,3 +103,28 @@ def analysis_material(datas):
     mdf = mdf.replace({np.nan: None})
     datas = mdf.to_dict('records')
     return datas
+
+
+network_columns_map = {
+    '姓名': 'user_name',
+    '网络环境': 'network',
+    '外包项目名称': 'outsource_project',
+    '备注': 'remarks'
+}
+
+
+def analysis_network(datas):
+    if not datas:
+        return []
+    df = pd.DataFrame(datas)
+    df = df[list(network_columns_map.keys())]
+    df.rename(columns=network_columns_map, inplace=True)
+    df = df.replace({np.nan: None})
+    ndf = df.copy()
+    oa_user_sections = get_oa_user_sections()
+    us_df = pd.DataFrame(oa_user_sections)
+    us_df = us_df[['user_work_id', 'user_name', 'department', 'subsector', 'minsector']]
+    mdf = pd.merge(ndf, us_df, on='user_name', how='left')
+    mdf = mdf.replace({np.nan: None})
+    datas = mdf.to_dict('records')
+    return datas

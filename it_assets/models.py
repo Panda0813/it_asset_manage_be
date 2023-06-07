@@ -85,3 +85,21 @@ class FixedAssetStatusRecord(models.Model):
         db_table = 'it_asset_status_record'
         verbose_name = '固定资产状态变更表'
         verbose_name_plural = verbose_name
+
+
+class UserNetworkRecord(models.Model):
+    user_name = models.CharField(verbose_name='使用人', max_length=50, null=True, blank=True)
+    user_work_id = models.CharField(verbose_name='工号', max_length=30, null=True, blank=True)
+    department = models.CharField(verbose_name='一级部门', max_length=100, null=True, blank=True)
+    subsector = models.CharField(verbose_name='二级部门', max_length=100, null=True, blank=True)
+    minsector = models.CharField(verbose_name='二级部门', max_length=100, null=True, blank=True)
+    network = models.CharField(verbose_name='网络环境', max_length=20, null=True, blank=True)
+    outsource_project = models.CharField(verbose_name='外包项目名称', max_length=100, null=True, blank=True)
+    create_time = models.DateTimeField(verbose_name='添加时间', auto_now_add=True)
+    update_time = models.DateTimeField(verbose_name='更新时间', auto_now=True, auto_now_add=False)
+    remarks = models.TextField(verbose_name='备注', null=True, blank=True)
+
+    class Meta:
+        db_table = 'it_network_record'
+        verbose_name = '人员网络环境记录表'
+        verbose_name_plural = verbose_name

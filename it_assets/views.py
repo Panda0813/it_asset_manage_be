@@ -4,12 +4,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db import transaction
 
-from it_assets.serializers import FixedAssetsSerializer, ConsumableMaterialSerializer, AssetStatusRecordSerializer
-from it_assets.models import FixedAssets, ConsumableMaterial, FixedAssetStatusRecord
+from it_assets.serializers import FixedAssetsSerializer, ConsumableMaterialSerializer, AssetStatusRecordSerializer, \
+    UserNetworkRecordSerializer
+from it_assets.models import FixedAssets, ConsumableMaterial, FixedAssetStatusRecord, UserNetworkRecord
 
 from utils.log_utils import set_create_log, set_update_log, set_delete_log, save_operateLog
 from utils.ext_utils import REST_FAIL, REST_SUCCESS, VIEW_FAIL, VIEW_SUCCESS, get_file_path, execute_batch_sql, create_excel_resp
-from it_assets.analy_utils import analysis_asset, analysis_material
+from it_assets.analy_utils import analysis_asset, analysis_material, analysis_network
 from utils.conn_mssql import query_section_user
 
 import os
@@ -124,6 +125,23 @@ def get_consumable_maps(request):
         'name_ls': name_ls,
         'brand_ls': brand_ls,
         'supplier_ls': supplier_ls
+    })
+
+
+@api_view(['GET'])
+def get_network_maps(request):
+    network_ls = ['双网', '内网', '外网', '无']
+    outsource_project_ls = ['展锐', '合芯', '清微智能', '仁芯', '同创', 'TMC', 'MTK']
+    outsource_project_qs = UserNetworkRecord.objects.values('outsource_project').distinct()
+    if outsource_project_qs:
+        outsource_project_ls.extend([item['outsource_project'] for item in list(outsource_project_qs)
+                                     if item['outsource_project']])
+        outsource_project_ls_ = list(set(outsource_project_ls))
+        outsource_project_ls_.sort(key=outsource_project_ls.index)
+        outsource_project_ls = outsource_project_ls_
+    return REST_SUCCESS({
+        'network_ls': network_ls,
+        'outsource_project_ls': outsource_project_ls
     })
 
 
@@ -332,8 +350,8 @@ def batch_delete_material(request):
             save_operateLog('delete', request.user, table_name, verbose_name, before={'id': delete_ls})
         return REST_SUCCESS({'msg': '操作成功'})
     except Exception as e:
-        logger.error('批量删除固定资产失败,error:{}'.format(str(e)))
-        return VIEW_FAIL(msg='批量删除固定资产失败, error:{}'.format(str(e)))
+        logger.error('批量删除非固定资产失败,error:{}'.format(str(e)))
+        return VIEW_FAIL(msg='批量删除非固定资产失败, error:{}'.format(str(e)))
 
 
 class AssetStatusRecordList(generics.ListCreateAPIView):
@@ -496,6 +514,11 @@ def export_fixed_assets(request):
         network = request.GET.get('network', '')
         if network:
             obj = obj.filter(network=network)
+        department_id = request.GET.get('department', '')
+        if department_id:
+            subsector_id = request.GET.get('subsector', None)
+            user_work_ids = query_section_user(department_id, subsector_id)
+            obj = obj.filter(user_work_id__in=user_work_ids)
 
         fuzzy_params = {}
         fuzzy_params['asset_number'] = request.GET.get('asset_number', '')
@@ -660,6 +683,11 @@ def export_consumable_material(request):
         if name:
             name_ls = name.split(',')
             obj = obj.filter(name__in=name_ls)
+        department_id = request.GET.get('department', '')
+        if department_id:
+            subsector_id = request.GET.get('subsector', None)
+            user_work_ids = query_section_user(department_id, subsector_id)
+            obj = obj.filter(user_work_id__in=user_work_ids)
 
         fuzzy_params = {}
         fuzzy_params['model_code'] = request.GET.get('model_code', '')
@@ -722,3 +750,253 @@ def export_consumable_material(request):
     except Exception as e:
         logger.error('非固定资产导出失败, error: {}'.format(traceback.format_exc()))
         return REST_FAIL({'msg': '非固定资产导出失败, error: {}'.format(str(e))})
+
+
+# 新增网络环境记录
+class NetworkRecordList(generics.ListCreateAPIView):
+    model = UserNetworkRecord
+    queryset = model.objects.all().order_by('user_name')
+    serializer_class = UserNetworkRecordSerializer
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        user_work_id = request.GET.get('user_work_id', '')
+        if user_work_id:
+            queryset = queryset.filter(user_work_id=user_work_id)
+        network = request.GET.get('network', '')
+        if network:
+            queryset = queryset.filter(network=network)
+        department_id = request.GET.get('department', '')
+        if department_id:
+            subsector_id = request.GET.get('subsector', None)
+            user_work_ids = query_section_user(department_id, subsector_id)
+            queryset = queryset.filter(user_work_id__in=user_work_ids)
+
+        fuzzy_params = {}
+        fuzzy_params['outsource_project'] = request.GET.get('outsource_project', '')
+        fuzzy_params['user_name'] = request.GET.get('user_name', '')
+
+        filter_params = {}
+        for k, v in fuzzy_params.items():
+            if v != None and v != '':
+                k = k + '__contains'
+                filter_params[k] = v
+
+        if filter_params:
+            queryset = queryset.filter(**filter_params)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @set_create_log
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class NetworkRecordDetail(generics.RetrieveUpdateDestroyAPIView):
+    model = UserNetworkRecord
+    queryset = model.objects.all()
+    serializer_class = UserNetworkRecordSerializer
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
+
+    @set_update_log
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    @set_delete_log
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return REST_SUCCESS({'msg': '删除成功'})
+
+
+@api_view(['POST'])
+def batch_delete_network(request):
+    model = UserNetworkRecord
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
+    try:
+        delete_ls = request.POST.get('delete_ls')
+        if delete_ls:
+            wait_delete_ls = delete_ls.split(',')
+            qs = UserNetworkRecord.objects.filter(id__in=wait_delete_ls)
+            qs.delete()
+            save_operateLog('delete', request.user, table_name, verbose_name, before={'id': delete_ls})
+        return REST_SUCCESS({'msg': '操作成功'})
+    except Exception as e:
+        logger.error('批量删除网络环境信息失败,error:{}'.format(str(e)))
+        return VIEW_FAIL(msg='批量删除网络环境信息失败, error:{}'.format(str(e)))
+
+
+# 批量插入网络环境信息
+def insert_network_record(datas):
+    insert_sql = '''insert into it_network_record(user_name, user_work_id, department, subsector, 
+                            minsector, network, outsource_project, create_time, update_time, remarks) 
+                            values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
+    update_sql = '''update it_network_record set user_name=%s,department=%s,subsector=%s,minsector=%s,
+                            network=%s,outsource_project=%s,update_time=%s,remarks=%s where user_work_id=%s'''
+    insert_ls = []
+    update_ls = []
+    count = 0
+    for data in datas:
+        now_ts = datetime.datetime.now()
+        count += 1
+        user_work_id = data.get('user_work_id')
+        qs = UserNetworkRecord.objects.filter(user_work_id=user_work_id)
+        if qs:
+            update_args = (data['user_name'], data['department'], data['subsector'], data['minsector'], data['network'],
+                           data['outsource_project'], now_ts, data['remarks'], user_work_id)
+            update_ls.append(update_args)
+        else:
+            insert_args = (data['user_name'], user_work_id, data['department'], data['subsector'], data['minsector'],
+                           data['network'], data['outsource_project'], now_ts, now_ts, data['remarks'])
+            insert_ls.append(insert_args)
+        if len(insert_ls) + len(update_ls) >= 30:
+            execute_batch_sql(insert_sql, insert_ls)
+            execute_batch_sql(update_sql, update_ls)
+            insert_ls = []
+            update_ls = []
+
+    if len(insert_ls) + len(update_ls) > 0:
+        execute_batch_sql(insert_sql, insert_ls)
+        execute_batch_sql(update_sql, update_ls)
+    return count
+
+
+# 导入网络环境信息
+@api_view(['POST'])
+def upload_network_record(request):
+    model = UserNetworkRecord
+    table_name = model._meta.db_table
+    verbose_name = model._meta.verbose_name
+    try:
+        try:
+            file = request.FILES.get('file', '')
+            if not file:
+                return VIEW_FAIL(msg='上传文件不能为空')
+            upload_path = get_file_path('network', 'upload_files')
+            with open(upload_path, 'wb') as f:
+                for i in file.chunks():
+                    f.write(i)
+            df = pd.read_excel(upload_path, sheet_name='网络环境')
+            datas = df.to_dict('records')
+            datas = analysis_network(datas)
+            try:
+                count = insert_network_record(datas)
+            except Exception as e:
+                logger.error('网络环境信息插入数据库失败, error:{}'.format(str(e)))
+                error_code = e.args[0]
+                if error_code == 1111:
+                    msg = e.args[1]
+                    error = e.args[1]
+                else:
+                    msg = '保存失败'
+                    error = str(e)
+                return VIEW_FAIL(msg=msg, data={'error': error})
+            save_operateLog('add', request.user, table_name, verbose_name, after={'id': '批量上传{}条数据'.format(count)})
+            return VIEW_SUCCESS(msg='导入成功')
+        except Exception as e:
+            logger.error('文件解析出错, error:{}'.format(str(e)))
+            return VIEW_FAIL(msg='文件解析出错, error:{}'.format(str(e)))
+    except Exception as e:
+        logger.error('网络环境信息导入失败, error:{}'.format(str(e)))
+        return VIEW_FAIL(msg='网络环境信息导入失败', data={'error': str(e)})
+
+
+# 导出网络环境信息
+@api_view(['GET'])
+def export_network_record(request):
+    try:
+        obj = UserNetworkRecord.objects
+        user_work_id = request.GET.get('user_work_id', '')
+        if user_work_id:
+            obj = obj.filter(user_work_id=user_work_id)
+        network = request.GET.get('network', '')
+        if network:
+            obj = obj.filter(network=network)
+        department_id = request.GET.get('department', '')
+        if department_id:
+            subsector_id = request.GET.get('subsector', None)
+            user_work_ids = query_section_user(department_id, subsector_id)
+            obj = obj.filter(user_work_id__in=user_work_ids)
+
+        fuzzy_params = {}
+        fuzzy_params['outsource_project'] = request.GET.get('outsource_project', '')
+        fuzzy_params['user_name'] = request.GET.get('user_name', '')
+
+        filter_params = {}
+        for k, v in fuzzy_params.items():
+            if v != None and v != '':
+                k = k + '__contains'
+                filter_params[k] = v
+
+        if filter_params:
+            obj = obj.filter(**filter_params)
+
+        qs = obj.values('user_name', 'user_work_id', 'department', 'subsector', 'minsector', 'network',
+                        'outsource_project', 'remarks')
+        blank_path = os.path.dirname(__file__) + '/blank_files/网络环境信息表.xlsx'
+        if not qs:
+            return create_excel_resp(blank_path, '网络环境信息表')
+        df = pd.DataFrame(list(qs))
+        # df.insert(0, 'no', range(1, 1 + len(df)))
+        rename_maps = {
+            'user_name': '姓名',
+            'user_work_id': '工号',
+            'department': '一级部门',
+            'subsector': '二级部门',
+            'minsector': '三级部门',
+            'network': '网络环境',
+            'outsource_project': '外包项目名称',
+            'remarks': '备注'
+        }
+        df.rename(rename_maps, axis=1, inplace=True)
+        file_path = get_file_path('material', 'export_files')
+        writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
+        workbook = writer.book
+        fmt = workbook.add_format({'font_size': 11, 'text_wrap': True, 'valign': 'vcenter', 'font_name': '等线'})
+        center_fmt = workbook.add_format(
+            {'font_size': 11, 'text_wrap': True, 'valign': 'vcenter', 'align': 'center', 'font_name': '等线'})
+        border_format = workbook.add_format({'border': 1})
+        title_fmt = workbook.add_format({'bold': True, 'font_size': 12, 'font_name': '等线',
+                                         'bg_color': '#d9d9d9', 'text_wrap': True, 'valign': 'vcenter'})
+        df.to_excel(writer, sheet_name='网络环境', header=False, index=False, startcol=0, startrow=1)
+        worksheet = writer.sheets['网络环境']
+        l_end = len(df.index) + 1
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, title_fmt)
+        worksheet.set_column('A:B', 16, fmt)
+        worksheet.set_column('C:E', 25, fmt)
+        worksheet.set_column('F:F', 13, fmt)
+        worksheet.set_column('G:G', 20, fmt)
+        worksheet.set_column('H:H', 25, fmt)
+        worksheet.conditional_format('A1:H%d' % l_end, {'type': 'blanks', 'format': border_format})
+        worksheet.conditional_format('A1:H%d' % l_end, {'type': 'no_blanks', 'format': border_format})
+        writer.save()
+        return create_excel_resp(file_path, '网络环境信息表')
+    except Exception as e:
+        logger.error('网络环境信息导出失败, error: {}'.format(traceback.format_exc()))
+        return REST_FAIL({'msg': '网络环境信息导出失败, error: {}'.format(str(e))})

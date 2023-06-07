@@ -131,8 +131,19 @@ def get_oa_user_sections(user_work_id=None):
                 else:
                     return x['d2']
         ddf['d2'] = ddf.apply(lambda x: check_d2_2(x), axis=1)
+
+        def check_d1(x):
+            if x['d1'] == x['d2']:
+                return None
+            elif x['d1'] == x['d3']:
+                return None
+            else:
+                return x['d1']
+
+        ddf['d1'] = ddf.apply(lambda x: check_d1(x), axis=1)
         ddf['department'] = ddf['d3']
         ddf['subsector'] = ddf['d2']
+        ddf['minsector'] = ddf['d1']
         ddf.drop(['d4', 'd3', 'd2', 'd1'], axis=1, inplace=True)
         ddf['user_work_id'] = pd.to_numeric(ddf['user_work_id'], errors='coerce')
         ddf.dropna(axis=0, subset=['user_work_id'], inplace=True)
@@ -258,10 +269,31 @@ def get_sections_tree():
 
         ddf['d2'] = ddf.apply(lambda x: check_d2_2(x), axis=1)
         ddf['d2_id'] = ddf.apply(lambda x: check_d2_2_id(x), axis=1)
+
+        def check_d1(x):
+            if x['d1'] == x['d2']:
+                return None
+            elif x['d1'] == x['d3']:
+                return None
+            else:
+                return x['d1']
+
+        def check_d1_id(x):
+            if x['d1_id'] == x['d2_id']:
+                return None
+            elif x['d1_id'] == x['d3_id']:
+                return None
+            else:
+                return x['d1_id']
+
+        ddf['d1'] = ddf.apply(lambda x: check_d1(x), axis=1)
+        ddf['d1_id'] = ddf.apply(lambda x: check_d1_id(x), axis=1)
         ddf['department'] = ddf['d3']
         ddf['department_id'] = ddf['d3_id']
         ddf['subsector'] = ddf['d2']
         ddf['subsector_id'] = ddf['d2_id']
+        ddf['minsector'] = ddf['d2']
+        ddf['minsector_id'] = ddf['d2_id']
         ddf['user_work_id'] = pd.to_numeric(ddf['user_work_id'], errors='coerce')
         ddf.dropna(axis=0, subset=['user_work_id'], inplace=True)
         ddf['user_work_id'] = ddf['user_work_id'].astype(int).astype(str)
@@ -269,6 +301,7 @@ def get_sections_tree():
         ddf = ddf.replace({np.nan: None})
         ddf['department_id'] = ddf['department_id'].map(lambda x: str(int(x)) if x else '')
         ddf['subsector_id'] = ddf['subsector_id'].map(lambda x: str(int(x)) if x else '')
+        ddf['minsector_id'] = ddf['minsector_id'].map(lambda x: str(int(x)) if x else '')
         qs = ddf.to_dict('records')
     cur.close()
     conn.close()
