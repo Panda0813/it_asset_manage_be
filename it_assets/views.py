@@ -259,7 +259,7 @@ def batch_delete_asset(request):
 # 新增非固定资产
 class ConsumableMaterialList(generics.ListCreateAPIView):
     model = ConsumableMaterial
-    queryset = model.objects.all().order_by('-create_time')
+    queryset = model.objects.all().order_by('-receive_date')
     serializer_class = ConsumableMaterialSerializer
     table_name = model._meta.db_table
     verbose_name = model._meta.verbose_name
