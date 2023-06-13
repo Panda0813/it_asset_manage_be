@@ -455,7 +455,9 @@ def upload_fixed_assets(request):
                 count += 1
                 lineNo = count + 1
                 asset_number = data.get('asset_number')
-                qs = FixedAssets.objects.filter(asset_number=asset_number)
+                qs = None
+                if asset_number:
+                    qs = FixedAssets.objects.filter(asset_number=asset_number)
                 with transaction.atomic():
                     save_id = transaction.savepoint()
                     try:
@@ -612,7 +614,9 @@ def insert_consumable_material(datas):
         now_ts = datetime.datetime.now()
         count += 1
         serial_number = data.get('serial_number')
-        qs = ConsumableMaterial.objects.filter(serial_number=serial_number)
+        qs = None
+        if serial_number:
+            qs = ConsumableMaterial.objects.filter(serial_number=serial_number)
         if qs:
             update_args = (data['receive_date'], data['user_name'], data['user_work_id'],
                            data['department'], data['subsector'], data['remarks'], now_ts, serial_number)
